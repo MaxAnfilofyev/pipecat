@@ -68,20 +68,19 @@ class GatedAggregator(FrameProcessor):
             await self.push_frame(frame, direction)
             return
 
-        old_state = self._gate_open
         if self._gate_open:
-            self._gate_open = not self._gate_close_fn(frame)
-        else:
-            self._gate_open = self._gate_open_fn(frame)
-
-        if old_state != self._gate_open:
-            state = "open" if self._gate_open else "closed"
-            logger.debug(f"Gate is now {state} because of {frame}")
-
-        if self._gate_open:
+            if self._gate_close_fn(frame):
+                self._gate_open = False
+                logger.debug(f"Gate is now closed because of {frame}")
+                return
             await self.push_frame(frame, direction)
-            for f, d in self._accumulator:
-                await self.push_frame(f, d)
-            self._accumulator = []
         else:
-            self._accumulator.append((frame, direction))
+            if self._gate_open_fn(frame):
+                self._gate_open = True
+                logger.debug(f"Gate is now open because of {frame}")
+                await self.push_frame(frame, direction)
+                for f, d in self._accumulator:
+                    await self.push_frame(f, d)
+                self._accumulator = []
+            else:
+                self._accumulator.append((frame, direction))
