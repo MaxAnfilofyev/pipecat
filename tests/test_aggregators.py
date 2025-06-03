@@ -74,3 +74,25 @@ class TestGatedAggregator(unittest.IsolatedAsyncioTestCase):
             frames_to_send=frames_to_send,
             expected_down_frames=expected_down_frames,
         )
+
+    async def test_gated_aggregator_drops_close_frame(self):
+        gated_aggregator = GatedAggregator(
+            gate_open_fn=lambda frame: isinstance(frame, OutputImageRawFrame),
+            gate_close_fn=lambda frame: isinstance(frame, LLMFullResponseStartFrame),
+            start_open=True,
+        )
+
+        frames_to_send = [
+            TextFrame("first"),
+            LLMFullResponseStartFrame(),
+            TextFrame("second"),
+            OutputImageRawFrame(image=b"image", size=(0, 0), format="RGB"),
+        ]
+
+        expected_down_frames = [TextFrame, OutputImageRawFrame, TextFrame]
+
+        (received_down, _) = await run_test(
+            gated_aggregator,
+            frames_to_send=frames_to_send,
+            expected_down_frames=expected_down_frames,
+        )
